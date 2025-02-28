@@ -1,13 +1,10 @@
 import { getConnection } from "./../database/database.js";
 
-// const getMusica = (req,res) => {
-//     res.json("Api Musical v1 - 27-02-2025")
-// }
-
+//Artistas
 const getArtistas = async (req, res) =>{
     try{
         const connection = await getConnection();
-        const result = await connection.query("SELECT idartista, nombreArtistico from artista");
+        const result = await connection.query("SELECT idartista, nombreArtistico, nacimiento, biografia, fotoartista  from artista");
         res.json(result);
     }catch(error){
         res.status(500);
@@ -17,13 +14,13 @@ const getArtistas = async (req, res) =>{
 
 const addArtistas = async (req, res) =>{
     try{
-        const {idartista,nombreArtistico} = req.body;
+        const {nombreArtistico, nacimiento, biografia, fotoartista} = req.body;
 
-        if(idartista == undefined || nombreArtistico == undefined){
+        if(nombreArtistico == undefined || nacimiento == undefined || biografia == undefined || fotoartista == undefined){
             res.status(400).json({message:"Bad Request. Please fill all field"});
         }
 
-        const artista = {idartista,nombreArtistico};
+        const artista = {nombreArtistico, nacimiento, biografia, fotoartista};
         const connection = await getConnection();
         const result=await connection.query("INSERT INTO artista set ?",artista)
         res.json("Artista Añadido");
@@ -33,7 +30,7 @@ const addArtistas = async (req, res) =>{
     }
 };
 
+
 export const methods = {
-    getArtistas,
-    addArtistas
+    getArtistas, addArtistas
 };
