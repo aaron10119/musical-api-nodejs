@@ -68,6 +68,14 @@ const registerUserQA = async (req, res) => {
         }
 
         const connection = await getConnection();
+
+        // Verificar si el nombre de usuario ya existe
+        const [existingUser] = await connection.query("SELECT * FROM usuario WHERE nomuser = ?", [nomuser]);
+        
+        if (existingUser) {
+            return res.status(400).json({ message: "El nombre de usuario ya está en uso" });
+        }
+
         const newUser = { nomuser, nombre, apellido, correo, password };
         await connection.query("INSERT INTO usuario SET ?", newUser);
 
@@ -76,6 +84,7 @@ const registerUserQA = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
 
 const loginUserQA = async (req, res) => {
     try {
@@ -153,11 +162,93 @@ const requestPasswordReset = async (req, res) => {
     }
 };
 
+const resetPassword = async (req, res) => {
+    try {
+        const { token, nuevaPassword } = req.body;
+
+        if (!token || !nuevaPassword) {
+            return res.status(400).json({ message: "Token y nueva contraseña son obligatorios" });
+        }
+
+        const connection = await getConnection();
+        const [user] = await connection.query("SELECT * FROM usuario WHERE reset_token = ? AND reset_token_expire > NOW()", [token]);
+
+        if (!user) {
+            return res.status(400).json({ message: "Token inválido o expirado" });
+        }
+
+        // Encriptar la nueva contraseña
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(nuevaPassword, salt);
+
+        // Actualizar la contraseña en la base de datos y eliminar el token
+        await connection.query("UPDATE usuario SET password = ?, reset_token = NULL, reset_token_expire = NULL WHERE idusuario = ?", 
+            [hashedPassword, user.idusuario]);
+
+        res.json({ message: "Contraseña restablecida correctamente" });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const getUserProfile = async (req, res) => {
+    try {
+        const { idusuario } = req.params; // Obtener el ID de la URL
+
+        if (!idusuario) {
+            return res.status(400).json({ message: "El ID de usuario es obligatorio" });
+        }
+
+        const connection = await getConnection();
+        const [user] = await connection.query(
+            "SELECT nomuser, nombre, apellido, correo, foto_perfil FROM usuario WHERE idusuario = ?",
+            [idusuario]
+        );
+
+        if (!user) {
+            return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const updateProfilePicture = async (req, res) => {
+    try {
+        const { idusuario } = req.params;
+        const { foto_perfil } = req.body;
+
+        if (!idusuario || !foto_perfil) {
+            return res.status(400).json({ message: "ID de usuario y foto de perfil son obligatorios" });
+        }
+
+        const connection = await getConnection();
+        const [user] = await connection.query("SELECT * FROM usuario WHERE idusuario = ?", [idusuario]);
+
+        if (!user) {
+            return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+
+        await connection.query("UPDATE usuario SET foto_perfil = ? WHERE idusuario = ?", [foto_perfil, idusuario]);
+
+        res.json({ message: "Foto de perfil actualizada correctamente", foto_perfil });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+
 
 
 export const methods = {
     registerUser,
     loginUser,
     registerUserQA,
-    loginUserQA
+    loginUserQA,
+    requestPasswordReset,
+    resetPassword,
+    getUserProfile,
+    updateProfilePicture
 };
